@@ -693,7 +693,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   header h1 { font-size: 17px; margin: 0; font-weight: 600; }
   header .sub { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
   header .stats { font-size: 12.5px; color: var(--accent); text-align: right; }
-  #main { flex: 1; display: flex; min-height: 0; }
+  #main { flex: 1; display: flex; min-height: 0; position: relative; }
   #map { flex: 1; min-width: 0; background: #0b1220; }
   #panel {
     width: 260px;
@@ -751,6 +751,34 @@ svg.leaflet-image-layer.leaflet-interactive path {
   }
   .pb-speed-btn.active { background: var(--accent); color: #06202e; border-color: var(--accent); font-weight: 600; }
   .plane-icon { transition: transform 0.05s linear; }
+
+  #video-col {
+    width: 400px; flex-shrink: 0; background: #0b1220; border-right: 1px solid var(--panel-border);
+    display: flex; flex-direction: column;
+  }
+  #video-col.collapsed { width: 0; overflow: hidden; border-right: none; }
+  #video-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-bottom: 1px solid var(--panel-border); flex-shrink: 0;
+  }
+  #video-head h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin: 0; }
+  #video-toggle {
+    background: none; border: 1px solid var(--panel-border); color: var(--text-dim); border-radius: 5px;
+    font-size: 11px; padding: 3px 8px; cursor: pointer;
+  }
+  #yt-player-wrap { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; flex-shrink: 0; }
+  #yt-player-wrap iframe, #yt-player { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #sync-status {
+    padding: 10px 12px; font-size: 12px; color: var(--text-dim); line-height: 1.6; border-bottom: 1px solid var(--panel-border);
+  }
+  #sync-status .on { color: var(--accent); font-weight: 600; }
+  #sync-status .dot2 { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:1px; }
+  #show-video-btn {
+    position: absolute; top: 100px; left: 14px; z-index: 500; background: var(--panel); color: var(--text);
+    border: 1px solid var(--panel-border); border-radius: 7px; padding: 7px 12px; font-size: 12px; cursor: pointer;
+    display: none;
+  }
+  #show-video-btn.visible { display: block; }
 </style>
 </head>
 <body>
@@ -767,6 +795,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
     </div>
   </header>
   <div id="main">
+    <div id="video-col">
+      <div id="video-head">
+        <h2>Vídeo (playlist)</h2>
+        <button id="video-toggle" title="Esconder vídeo">Esconder</button>
+      </div>
+      <div id="yt-player-wrap"><div id="yt-player"></div></div>
+      <div id="sync-status"><span class="dot2" style="background:#64748b"></span>Carregando player…</div>
+    </div>
+    <button id="show-video-btn">▶ Mostrar vídeo</button>
     <div id="map"></div>
     <div id="panel">
       <h2>Voos</h2>
@@ -895,26 +932,26 @@ if (allBounds.length) {
 }
 
 /* ---------- Reprodução animada (cursor percorrendo os 3 voos sem interrupção) ---------- */
-(function () {
-  // Concatena os pontos dos 3 voos, na ordem 034 -> 041 -> 042, mantendo qual voo cada ponto pertence.
-  const combined = [];
-  const flightOfPoint = [];
-  FLIGHTS.forEach((f, fi) => {
-    f.pts.forEach(p => { combined.push(p); flightOfPoint.push(fi); });
-  });
-  if (combined.length < 2) return;
+// Concatena os pontos dos 3 voos, na ordem 034 -> 041 -> 042, mantendo qual voo cada ponto pertence.
+const combined = [];
+const flightOfPoint = [];
+const flightStartOffset = []; // índice em `combined` onde cada voo começa (~segundos de tempo virtual)
+FLIGHTS.forEach((f, fi) => {
+  flightStartOffset.push(combined.length);
+  f.pts.forEach(p => { combined.push(p); flightOfPoint.push(fi); });
+});
 
-  // ~1 ponto por segundo (amostragem já feita na extração) -> cada passo = 1s de "tempo virtual".
-  const totalVirtual = combined.length - 1;
+// ~1 ponto por segundo (amostragem já feita na extração) -> cada passo = 1s de "tempo virtual".
+const totalVirtual = combined.length - 1;
 
-  function bearing(p1, p2) {
-    const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
-    const lat1 = toRad(p1[0]), lat2 = toRad(p2[0]);
-    const dLon = toRad(p2[1] - p1[1]);
-    const y = Math.sin(dLon) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-    return (toDeg(Math.atan2(y, x)) + 360) % 360;
-  }
+function bearing(p1, p2) {
+  const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
+  const lat1 = toRad(p1[0]), lat2 = toRad(p2[0]);
+  const dLon = toRad(p2[1] - p1[1]);
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
 
   const animIcon = L.divIcon({
     className: '',
@@ -1017,7 +1054,102 @@ if (allBounds.length) {
   });
 
   render(0);
-})();
+
+/* ---------- Sincronização com o vídeo do YouTube ---------- */
+const PLAYLIST_ID = 'PLUAk8QaKltKI';
+const videoCol = document.getElementById('video-col');
+const videoToggle = document.getElementById('video-toggle');
+const showVideoBtn = document.getElementById('show-video-btn');
+const syncStatusEl = document.getElementById('sync-status');
+const playbackPanel = document.getElementById('playback');
+
+let ytPlayer = null;
+let syncEngaged = false;
+let syncIntervalId = null;
+
+function setSyncStatus(html) { syncStatusEl.innerHTML = html; }
+
+function enterSyncMode() {
+  if (syncEngaged) return;
+  syncEngaged = true;
+  if (playbackPanel) playbackPanel.style.display = 'none';
+  playing = false;
+  if (rafId) cancelAnimationFrame(rafId);
+}
+
+function exitSyncMode() {
+  syncEngaged = false;
+  if (playbackPanel) playbackPanel.style.display = '';
+  if (syncIntervalId) { clearInterval(syncIntervalId); syncIntervalId = null; }
+}
+
+function pollVideoTime() {
+  if (!ytPlayer || typeof ytPlayer.getPlaylistIndex !== 'function') return;
+  let idx, curT, state;
+  try {
+    idx = ytPlayer.getPlaylistIndex();
+    curT = ytPlayer.getCurrentTime();
+    state = ytPlayer.getPlayerState();
+  } catch (e) { return; }
+  if (idx === -1 || idx == null || FLIGHTS[idx] === undefined) return;
+
+  const f = FLIGHTS[idx];
+  const clampedT = Math.max(0, Math.min(curT, f.dur_s));
+  const virtualT = flightStartOffset[idx] + clampedT;
+  render(virtualT);
+
+  const dotColor = f.color;
+  const stateLabel = state === 1 ? 'reproduzindo' : (state === 2 ? 'pausado' : 'carregando');
+  setSyncStatus(
+    '<span class="dot2" style="background:' + dotColor + '"></span>' +
+    '<span class="on">Sincronizado</span> — Voo ' + f.label + ' (' + stateLabel + ')<br/>' +
+    'Cursor no mapa segue o vídeo automaticamente.'
+  );
+}
+
+function onYouTubeIframeAPIReady() {
+  ytPlayer = new YT.Player('yt-player', {
+    playerVars: { listType: 'playlist', list: PLAYLIST_ID, enablejsapi: 1, rel: 0, playsinline: 1 },
+    events: {
+      onReady: function () {
+        setSyncStatus('Pronto — dê play no vídeo para o cursor começar a seguir.');
+      },
+      onStateChange: function (e) {
+        if (e.data === YT.PlayerState.PLAYING) {
+          enterSyncMode();
+          if (!syncIntervalId) syncIntervalId = setInterval(pollVideoTime, 250);
+          pollVideoTime();
+        } else if (e.data === YT.PlayerState.PAUSED) {
+          pollVideoTime();
+        }
+      },
+      onError: function () {
+        setSyncStatus('Não foi possível carregar o player do YouTube.');
+      }
+    }
+  });
+}
+
+// Carrega a API do YouTube (só quando o painel de vídeo existe na página).
+if (videoCol) {
+  const ytScript = document.createElement('script');
+  ytScript.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(ytScript);
+  window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+}
+
+videoToggle.addEventListener('click', () => {
+  videoCol.classList.add('collapsed');
+  showVideoBtn.classList.add('visible');
+  exitSyncMode();
+  setTimeout(() => map.invalidateSize(), 260);
+});
+
+showVideoBtn.addEventListener('click', () => {
+  videoCol.classList.remove('collapsed');
+  showVideoBtn.classList.remove('visible');
+  setTimeout(() => map.invalidateSize(), 260);
+});
 </script>
 </body>
 </html>

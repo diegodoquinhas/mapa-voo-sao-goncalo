@@ -753,19 +753,22 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .plane-icon { transition: transform 0.05s linear; }
 
   #video-col {
-    width: 400px; flex-shrink: 0; background: #0b1220; border-right: 1px solid var(--panel-border);
-    display: flex; flex-direction: column;
+    width: clamp(420px, 46vw, 820px); flex-shrink: 0; background: #0b1220; border-right: 1px solid var(--panel-border);
+    display: flex; flex-direction: column; transition: width 0.22s ease;
   }
+  #video-col.expanded { width: clamp(600px, 64vw, 1240px); }
   #video-col.collapsed { width: 0; overflow: hidden; border-right: none; }
   #video-head {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 12px; border-bottom: 1px solid var(--panel-border); flex-shrink: 0;
+    padding: 10px 12px; border-bottom: 1px solid var(--panel-border); flex-shrink: 0; gap: 8px;
   }
   #video-head h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin: 0; }
-  #video-toggle {
+  #video-head-btns { display: flex; gap: 6px; flex-shrink: 0; }
+  #video-toggle, #video-expand {
     background: none; border: 1px solid var(--panel-border); color: var(--text-dim); border-radius: 5px;
     font-size: 11px; padding: 3px 8px; cursor: pointer;
   }
+  #video-expand.active { background: var(--accent); color: #06202e; border-color: var(--accent); font-weight: 600; }
   #yt-player-wrap { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; flex-shrink: 0; }
   #yt-player-wrap iframe, #yt-player { position: absolute; inset: 0; width: 100%; height: 100%; }
   #sync-status {
@@ -798,7 +801,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <div id="video-col">
       <div id="video-head">
         <h2>Vídeo (playlist)</h2>
-        <button id="video-toggle" title="Esconder vídeo">Esconder</button>
+        <div id="video-head-btns">
+          <button id="video-expand" title="Ampliar vídeo">⤢ Ampliar</button>
+          <button id="video-toggle" title="Esconder vídeo">Esconder</button>
+        </div>
       </div>
       <div id="yt-player-wrap"><div id="yt-player"></div></div>
       <div id="sync-status"><span class="dot2" style="background:#64748b"></span>Carregando player…</div>
@@ -1148,6 +1154,15 @@ videoToggle.addEventListener('click', () => {
 showVideoBtn.addEventListener('click', () => {
   videoCol.classList.remove('collapsed');
   showVideoBtn.classList.remove('visible');
+  setTimeout(() => map.invalidateSize(), 260);
+});
+
+const videoExpandBtn = document.getElementById('video-expand');
+videoExpandBtn.addEventListener('click', () => {
+  const expanded = videoCol.classList.toggle('expanded');
+  videoExpandBtn.classList.toggle('active', expanded);
+  videoExpandBtn.textContent = expanded ? '⤡ Reduzir' : '⤢ Ampliar';
+  videoExpandBtn.title = expanded ? 'Reduzir vídeo' : 'Ampliar vídeo';
   setTimeout(() => map.invalidateSize(), 260);
 });
 </script>
